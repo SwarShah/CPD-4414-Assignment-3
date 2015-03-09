@@ -15,6 +15,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import credentials.Credentials;
 import java.util.Set;
+import javax.json.Json;
+import javax.json.JsonObject;
 import org.json.simple.*;
 
 /**
@@ -34,33 +36,40 @@ public class products extends HttpServlet {
      * @throws IOException if an I/O error occurs
      */
     private String getResults(String query, String... params) {
+        JSONArray jArray = new JSONArray();
         StringBuilder sb = new StringBuilder();
-        sb.append("[ ");
-        JSONObject json = new JSONObject();
+        Boolean isSingle = false;
         try (Connection cn = Credentials.getConnection()) {
             PreparedStatement pstmt = cn.prepareStatement(query);
             for (int i = 1; i <= params.length; i++) {
                 pstmt.setString(i, params[i - 1]);
+                isSingle = true;
             }
             ResultSet rs = pstmt.executeQuery();
-
-            while (rs.next()) {
-                if (!sb.toString().equals("[ ")) {
-                    sb.append(",\n");
+            if (isSingle == false) {
+                while (rs.next()) {
+                    JSONObject json = new JSONObject();
+                    json.put("productId", rs.getInt("productId"));
+                    json.put("name", rs.getString("name"));
+                    json.put("description", rs.getString("description"));
+                    json.put("quantity", rs.getInt("quantity"));
+                    jArray.add(json);
                 }
-                json.put("productId", rs.getInt("productId"));
-                json.put("name", rs.getString("name"));
-                json.put("description", rs.getString("description"));
-                json.put("quantity", rs.getInt("quantity"));
-                sb.append(json.toJSONString());
-                json.clear();
+            } else {
+                while (rs.next()) {
+                    JsonObject jsonObj = Json.createObjectBuilder()
+                            .add("productId", rs.getInt("productId"))
+                            .add("name", rs.getString("name"))
+                            .add("description", rs.getString("description"))
+                            .add("quantity", rs.getInt("quantity"))
+                            .build();
+                    return jsonObj.toString();
+                }
             }
         } catch (SQLException ex) {
             Logger.getLogger(products.class.getName()).log(Level.SEVERE, null, ex);
         }
-        //return sb.toString();
-        sb.append(" ]");
-        return sb.toString();
+        return jArray.toJSONString();
     }
 
     @Override
@@ -151,7 +160,7 @@ public class products extends HttpServlet {
         } catch (IOException ex) {
             Logger.getLogger(products.class.getName()).log(Level.SEVERE, null, ex);
         }
-        
+
     }
 
     /**
